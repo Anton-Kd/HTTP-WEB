@@ -1,11 +1,9 @@
 package ru.netology;
 
-import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -41,46 +39,54 @@ public class Server {
 
     private void connectionProcessing(Socket socket) {
         try (
-                final var in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                final var in = new BufferedInputStream(socket.getInputStream());
                 final var out = new BufferedOutputStream(socket.getOutputStream())
         ) {
 
-            // GET /path HTTP/1.1
-            final var requestLine = in.readLine();
-            final var parts = requestLine.split(" ");
-
-            if (parts.length != 3) {
-                // закрыть сокет
-                return;
-            }
-            String method = parts[0];
-            final var path = parts[1];
-            Request request = createRequest(method, path);
-
-            // проверяем запрос наличие плохих запросов и разрываем соединение
-
+            Request request = Request.createRequest(in);
+            // Проверяем наличие плохих запросов и разрываем соединение
             if (request == null || !handlers.containsKey(request.getMethod())) {
                 responseWithoutContent(out, "400", "Bad Request");
                 return;
+            } else {
+                // выводим отладочную информацию для запроса
+                printRequestDebug(request);
             }
+
             // Получаем путь и хэндлер
             Map<String, Handler> handlerMap = handlers.get(request.getMethod());
-            String requestPath = request.getPath();
-            if (handlerMap.containsKey(requestPath)) {
-                Handler handler = handlerMap.get(requestPath);
+            String path = request.getPath().split("\\?")[0];
+            if (handlerMap.containsKey(path)) {
+                Handler handler = handlerMap.get(path);
                 handler.handle(request, out);
             } else {  // по умолчанию
                 // ресурс не найден
-                if (!validPaths.contains(request.getPath())) {
+                if (!validPaths.contains(path)) {
                     responseWithoutContent(out, "404", "Not Found");
                 } else {
                     defaultHandler(out, path);
                 }
             }
 
-        } catch (IOException e) {
+        } catch (IOException | URISyntaxException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private void printRequestDebug(Request request) {
+        System.out.println("Request debug information: ");
+        System.out.println("METHOD: " + request.getMethod());
+        System.out.println("PATH: " + request.getPath());
+        System.out.println("HEADERS: " + request.getHeaders());
+        System.out.println("Query Params:");
+        for (var para : request.getQueryParams()) {
+            System.out.println(para.getName() + " = " + para.getValue());
+        }
+
+        System.out.println("Test for dumb param name:");
+        System.out.println(request.getQueryParam("YetAnotherDumb").getName());
+        System.out.println("Test for dumb param name-value:");
+        System.out.println(request.getQueryParam("testDebugInfo").getValue());
     }
 
     void defaultHandler(BufferedOutputStream out, String path) throws IOException {
@@ -116,17 +122,6 @@ public class Server {
         ).getBytes());
         Files.copy(filePath, out);
         out.flush();
-
-    }
-
-
-    private Request createRequest(String method, String path) {
-        // проверяем на наличие плохих полей
-        if (method != null && !method.isBlank()) {
-            return new Request(method, path);
-        } else {
-            return null;
-        }
 
     }
 

@@ -1,7 +1,6 @@
 package ru.netology;
 
 
-import java.io.BufferedOutputStream;
 import java.io.IOException;
 
 public class Main {
@@ -15,7 +14,7 @@ public class Main {
 
         server.addHandler("GET", "/messages", (request, responseStream) -> {
             try {
-                server.responseWithoutContent(responseStream, "400", "Not Found");
+                server.responseWithoutContent(responseStream, "200", "OK");
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
