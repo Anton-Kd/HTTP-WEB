@@ -15,7 +15,7 @@ public class Main {
 
         server.addHandler("GET", "/messages", (request, responseStream) -> {
             try {
-                server.responseWithoutContent(responseStream, "200", "OK");
+                server.responseWithoutContent(responseStream, "400", "Not Found");
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
